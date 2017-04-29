@@ -41,11 +41,11 @@ class ReplayGain:
         ret = []
         ret.extend(self.iTunNORM)
         ret[0] = self.__gain_to_sc(1000)
-        if ret[1] != '00000000':
-            ret[1] = ret[0]
+        #if ret[1] != '00000000':
+        ret[1] = ret[0]
         ret[2] = self.__gain_to_sc(2500)
-        if ret[3] != '00000000':
-            ret[3] = ret[2]
+        #if ret[3] != '00000000':
+        ret[3] = ret[2]
 
         if verbose:
             print "New iTunNORM: %s" % " ".join(ret)
@@ -64,25 +64,47 @@ class ReplayGain:
 
 class ReplayGainMP3(ReplayGain):
     def __init__(self, tags, album=False):
-        k = "RVA2:track"
+        #print tags
+        #sys.exit(1)
+        k = u'TXXX:REPLAYGAIN_TRACK_GAIN'
+        if u'TXXX:replaygain_track_gain' in tags:
+            k = u'TXXX:replaygain_track_gain'
+        k2 = u'TXXX:REPLAYGAIN_TRACK_PEAK'
+        if u'TXXX:replaygain_track_peak' in tags:
+            k2 = u'TXXX:replaygain_track_peak'
         if album:
-            if "RVA2:album" in tags:
-                k = "RVA2:album"
+            if u'TXXX:REPLAYGAIN_ALBUM_GAIN' in tags:
+                k = u'TXXX:REPLAYGAIN_ALBUM_GAIN'
+                k2 = u'TXXX:REPLAYGAIN_ALBUM_PEAK'
+                if u'TXXX:replaygain_album_peak' in tags:
+                    k2 = u'TXXX:replaygain_album_peak'
+            elif u'TXXX:replaygain_album_gain' in tags:
+                k = u'TXXX:replaygain_album_gain'
+                k2 = u'TXXX:REPLAYGAIN_ALBUM_PEAK'
+                if u'TXXX:replaygain_album_peak' in tags:
+                    k2 = u'TXXX:replaygain_album_peak'
             else:
                 print "Warning: Album ReplayGain requested, but no tag was found."
                 print "\tContinuing anyway with track ReplayGain instead..."
-
+        #print k
+        #print k2
         if k in tags:
             if verbose:
                 print "%s" % tags[k]
-            for i in ("gain", "peak"):
-                setattr(self, i, getattr(tags[k], i))
+            setattr(self, "gain", float(tags[k][0].split()[0]))
         else:
             raise ReplayGainError("No RVA2 tag found!")
-        if "COMM:iTunNORM:'eng'" in tags:
+        if k2 in tags:
             if verbose:
-                print "Starting iTunNORM:%s" % tags["COMM:iTunNORM:'eng'"].text[0]
-            self.iTunNORM = tags["COMM:iTunNORM:'eng'"].text[0].split()
+                print "%s" % tags[k2]
+            #print float(tags[k2][0])
+            setattr(self, "peak", float(tags[k2][0]))
+        else:
+            raise ReplayGainError("No RVA2 tag found!")
+        if u'COMM:iTunNORM:eng' in tags:
+            if verbose:
+                print "Starting iTunNORM:%s" % tags[u'COMM:iTunNORM:eng'].text[0]
+            self.iTunNORM = tags[u'COMM:iTunNORM:eng'].text[0].split()
 
     def to_soundcheck(self, tags):
         frame = mutagen.id3.COMM(encoding=0, lang=u'eng', desc=u'iTunNORM', text=self._to_soundcheck())
@@ -91,6 +113,8 @@ class ReplayGainMP3(ReplayGain):
 
 class ReplayGainMP4(ReplayGain):
     def __init__(self, tags, album=False):
+        #print tags
+        #sys.exit(1)
         k = "track"
         if album:
             if "----:com.apple.iTunes:replaygain_album_gain" in tags:
@@ -150,9 +174,10 @@ def main(argv):
             rg = replaygain_init(audio.tags, album=args.album)
         except ReplayGainError, err:
             print "Error: %s" % err
-            continue
+            sys.exit(255)
 
         rg.to_soundcheck(audio.tags)
+        #sys.exit(1)
 
         audio.save()
 
